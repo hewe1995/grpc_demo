@@ -46,20 +46,23 @@ import (
 	"google.golang.org/grpc/transport"
 )
 
+//默认发送和接收数据大小
 const (
 	defaultServerMaxReceiveMessageSize = 1024 * 1024 * 4
 	defaultServerMaxSendMessageSize    = 1024 * 1024 * 4
 )
-
+//rpc 服务方法handler
 type methodHandler func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor UnaryServerInterceptor) (interface{}, error)
 
 // MethodDesc represents an RPC service's method specification.
+//rpc 服务的方法描述
 type MethodDesc struct {
 	MethodName string
 	Handler    methodHandler
 }
 
 // ServiceDesc represents an RPC service's specification.
+//rpc 服务描述
 type ServiceDesc struct {
 	ServiceName string
 	// The pointer to the service interface. Used to check whether the user
@@ -72,6 +75,7 @@ type ServiceDesc struct {
 
 // service consists of the information of the server serving this service and
 // the methods in this service.
+//server 和方法
 type service struct {
 	server interface{} // the server for service methods
 	md     map[string]*MethodDesc
@@ -80,23 +84,26 @@ type service struct {
 }
 
 // Server is a gRPC server to serve RPC requests.
+//为rpc请求提供服务的服务器
 type Server struct {
 	opts options
 
 	mu     sync.Mutex // guards following
-	lis    map[net.Listener]bool
-	conns  map[io.Closer]bool
-	serve  bool
-	drain  bool
-	ctx    context.Context
+	lis    map[net.Listener]bool //网络端口监听
+	conns  map[io.Closer]bool //是否关闭
+	serve  bool	//是否在服务
+	drain  bool //
+	ctx    context.Context //上下文
 	cancel context.CancelFunc
 	// A CondVar to let GracefulStop() blocks until all the pending RPCs are finished
 	// and all the transport goes away.
+	//条件锁,让GracefulStop()阻塞,等到所有RPC结束,所有的传输消失
 	cv     *sync.Cond
 	m      map[string]*service // service name -> service info
 	events trace.EventLog
 }
 
+//服务可选操作
 type options struct {
 	creds                 credentials.TransportCredentials
 	codec                 Codec
@@ -117,16 +124,19 @@ type options struct {
 	initialConnWindowSize int32
 }
 
+//默认操作
 var defaultServerOptions = options{
 	maxReceiveMessageSize: defaultServerMaxReceiveMessageSize,
 	maxSendMessageSize:    defaultServerMaxSendMessageSize,
 }
 
 // A ServerOption sets options such as credentials, codec and keepalive parameters, etc.
+//一个服务选项 设置选项比如验证,编译码,连接保持存活时间
 type ServerOption func(*options)
 
 // InitialWindowSize returns a ServerOption that sets window size for stream.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+//初始化缓冲大小,返回serverOption 为stream设置缓冲大小,最小大小是64k,小于64k的都会被忽略
 func InitialWindowSize(s int32) ServerOption {
 	return func(o *options) {
 		o.initialWindowSize = s
@@ -135,6 +145,7 @@ func InitialWindowSize(s int32) ServerOption {
 
 // InitialConnWindowSize returns a ServerOption that sets window size for a connection.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+//初始化连接缓冲大小,返回serverOption 为stream设置缓冲大小,最小大小是64k,小于64k的都会被忽略
 func InitialConnWindowSize(s int32) ServerOption {
 	return func(o *options) {
 		o.initialConnWindowSize = s
@@ -142,6 +153,7 @@ func InitialConnWindowSize(s int32) ServerOption {
 }
 
 // KeepaliveParams returns a ServerOption that sets keepalive and max-age parameters for the server.
+//设置keepalive和max-age参数
 func KeepaliveParams(kp keepalive.ServerParameters) ServerOption {
 	return func(o *options) {
 		o.keepaliveParams = kp
@@ -274,6 +286,7 @@ func UnknownServiceHandler(streamHandler StreamHandler) ServerOption {
 
 // NewServer creates a gRPC server which has no service registered and has not
 // started to accept requests yet.
+//新建一个服务器
 func NewServer(opt ...ServerOption) *Server {
 	opts := defaultServerOptions
 	for _, o := range opt {
@@ -281,6 +294,7 @@ func NewServer(opt ...ServerOption) *Server {
 	}
 	if opts.codec == nil {
 		// Set the default codec.
+		//设置默认编码,默认使用protobuf
 		opts.codec = protoCodec{}
 	}
 	s := &Server{
